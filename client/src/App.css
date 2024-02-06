@@ -2,6 +2,16 @@
   display: none;
 }
 
+/*.reactMarkDown {*/
+/*  padding: 0;*/
+/*  margin: 0;*/
+/*  border: 0;*/
+/*}*/
+
+.reactMarkDown p {
+  margin: 0;
+}
+
 .App {
   text-align: center;
 }

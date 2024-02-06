@@ -2,8 +2,9 @@
 import cors from 'cors';
 import path from 'path';
 import express, { Request, Response } from 'express';
-import {ChatSession, GoogleGenerativeAI} from '@google/generative-ai';
+import {ChatSession, GoogleGenerativeAI, InputContent} from '@google/generative-ai';
 import { HarmBlockThreshold, HarmCategory } from '@google/generative-ai';
+import OpenAI from "openai";
 
 // console.log(process.env);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY ?? '');
@@ -37,6 +38,90 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'client/build')));
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 3000,
+});
+
+const deepSeek = new OpenAI({
+  apiKey: process.env.DEEPSEEKAI_API_KEY,
+  baseURL: process.env.DEEPSEEKAI_BASE_URL,
+  timeout: 3000,
+});
+
+const neuroGpt = new OpenAI({
+  apiKey: process.env.NEUROGPT_API_KEY,
+  baseURL: process.env.NEUROGPT_BASE_URL,
+  timeout: 3000,
+});
+
+app.post('/api/chat', async (req: Request, res: Response) => {
+  try {
+    const { model, prompt, history } = req.body;
+    if (!(typeof model === 'string')) {
+      return res.status(400).send('Missing model parameter in the body.');
+    }
+
+    if (!prompt) {
+      return res.status(400).send('Missing prompt parameter in the body.');
+    }
+
+    if (model === 'gpt-4') {
+      let error = null;
+
+      console.log('prompt', prompt);
+      const models = ['gpt-4-1106-preview'];
+      for (const modelKey of models) {
+        console.log('model', modelKey);
+        try {
+          await sendStream(history, modelKey, prompt, neuroGpt, res);
+          console.log('ok');
+          return;
+        }
+        catch (e: any) {
+          error = e;
+          console.log(e.message);
+        }
+      }
+
+      throw error;
+    }
+
+    const ai = model.startsWith('deepseek') ? deepSeek : openai;
+
+    // throw new Error("some error text");
+
+    await sendStream(history, model, prompt, ai, res);
+  } catch (error: any) {
+    console.error(error);
+    res.status(500).send(error.message);
+  }
+});
+
+const sendStream = async (history: any[], model: string, prompt: string, ai: OpenAI, res: Response) => {
+  const messages = ((history ?? []) as InputContent[])
+    .map(item => ({role: item.role === 'user' ? 'user' as const : 'assistant' as const, content: item.parts as string}))
+
+  const stream = await ai.chat.completions.create({
+    model: model,
+    messages: [...messages, { role: 'user', content: prompt }],
+    stream: true,
+  });
+
+  const content: string[] = [];
+  for await (const chunk of stream) {
+    const text = chunk.choices[0]?.delta?.content || '';
+    content.push(text);
+    res.write(text);
+  }
+
+  if (content.join('').trim() === '') {
+    throw new Error('Empty response');
+  }
+
+  res.end();
+}
 
 app.post('/api/gemini', async (req: Request, res: Response) => {
   try {
@@ -157,3 +242,5 @@ const port = process.env.PORT || 3001;
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+export default app;
