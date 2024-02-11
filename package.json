@@ -6,8 +6,7 @@
   "scripts": {
     "build": "tsc && cd client && npm install && npm run build",
     "start": "nodemon ./api/index.ts",
-    "start2": "node ./api/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start2": "node ./api/index.js"
   },
   "keywords": [],
   "author": "",
