@@ -25,3 +25,4 @@ yarn-error.log*
 /.firebase
 .firebaserc
 app.js
+index.js
